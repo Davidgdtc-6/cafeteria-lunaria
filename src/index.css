@@ -1,0 +1,147 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,700,60,1&family=Manrope:wght@400;600;700;800&family=Source+Code+Pro:wght@500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #2d2d2d;
+  background: #fafaf7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: #fafaf7;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 232, 181, 0.72), transparent 26rem),
+    radial-gradient(circle at 86% 12%, rgba(247, 207, 195, 0.68), transparent 28rem),
+    #fafaf7;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  content: "";
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+}
+
+button,
+a,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img {
+  display: block;
+}
+
+::selection {
+  color: #ffffff;
+  background: #749084;
+}
+
+.section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(122, 74, 46, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 0.62rem 0.92rem;
+  box-shadow: 0 14px 44px rgba(45, 45, 45, 0.08);
+  color: #7a4a2e;
+  font-family: "Source Code Pro", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.section-kicker::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #749084;
+  content: "";
+}
+
+.organic-shape {
+  position: absolute;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 47% 53% 60% 40% / 45% 42% 58% 55%;
+  filter: blur(2px);
+  animation: float-shape 10s ease-in-out infinite alternate;
+}
+
+.organic-shape:nth-of-type(2n) {
+  animation-duration: 12s;
+  animation-direction: alternate-reverse;
+}
+
+.texture-solar::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.18;
+  background-image:
+    radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.45) 0 1px, transparent 1px),
+    radial-gradient(circle at 78% 68%, rgba(122, 74, 46, 0.28) 0 1px, transparent 1px);
+  background-size: 18px 18px, 26px 26px;
+}
+
+.menu-card,
+.gallery-item,
+.magnetic-button {
+  will-change: transform;
+}
+
+.pl-13 {
+  padding-left: 3.25rem;
+}
+
+@keyframes float-shape {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  to {
+    transform: translate3d(1.4rem, -1rem, 0) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
