@@ -27,7 +27,7 @@ import {
   CartFab,
   CartProvider,
   parsePrice,
-  useCart,
+  useOrderWhatsApp,
 } from "./cart";
 import { whatsAppUrl } from "./whatsapp";
 
@@ -791,15 +791,9 @@ function App() {
   );
 }
 
-function useOrderWhatsAppUrl() {
-  const { orderLink } = useCart();
-
-  return orderLink || whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.");
-}
-
 function Navbar({ isScrolled }) {
   const [open, setOpen] = useState(false);
-  const orderUrl = useOrderWhatsAppUrl();
+  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
   const navLinks = [
     { label: "Inicio", id: "inicio" },
     { label: "Menú", id: "menu" },
@@ -856,6 +850,7 @@ function Navbar({ isScrolled }) {
         <div className="flex items-center gap-2">
           <MagneticButton
             href={orderUrl}
+            onClick={handleOrder}
             target="_blank"
             rel="noreferrer"
             className="hidden bg-lunaria-coal text-white hover:bg-lunaria-solar sm:inline-flex"
@@ -908,6 +903,7 @@ function Navbar({ isScrolled }) {
           ))}
           <MagneticButton
             href={orderUrl}
+            onClick={handleOrder}
             target="_blank"
             rel="noreferrer"
             className="mt-2 w-full bg-lunaria-solar text-white"
@@ -922,7 +918,7 @@ function Navbar({ isScrolled }) {
 }
 
 function Hero() {
-  const orderUrl = useOrderWhatsAppUrl();
+  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
 
   return (
     <section
@@ -967,6 +963,7 @@ function Hero() {
             </MagneticButton>
             <MagneticButton
               href={orderUrl}
+              onClick={handleOrder}
               target="_blank"
               rel="noreferrer"
               className="border border-lunaria-coffee/12 bg-white text-lunaria-coal shadow-soft hover:bg-lunaria-cream"
@@ -1459,7 +1456,7 @@ function FAQ({ activeFaq, setActiveFaq }) {
 }
 
 function FinalCTA() {
-  const orderUrl = useOrderWhatsAppUrl();
+  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
 
   return (
     <section id="contacto" className="scroll-mt-28 px-4 py-20 sm:px-6 lg:px-8">
@@ -1483,6 +1480,7 @@ function FinalCTA() {
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
             <MagneticButton
               href={orderUrl}
+              onClick={handleOrder}
               target="_blank"
               rel="noreferrer"
               className="bg-white text-lunaria-coal hover:bg-lunaria-cream"

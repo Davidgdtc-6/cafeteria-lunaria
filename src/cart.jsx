@@ -20,6 +20,21 @@ import { whatsAppUrl } from "./whatsapp";
 
 export const CART_STORAGE_KEY = "lunaria-cart-v1";
 
+export const DELIVERY_MINIMUM = 1.5;
+
+export const MODALITIES = {
+  pickup: {
+    id: "pickup",
+    label: "Para llevar",
+    hint: "Recojo en el local",
+  },
+  delivery: {
+    id: "delivery",
+    label: "Envío a domicilio",
+    hint: `Pedido mínimo ${formatPrice(DELIVERY_MINIMUM)}`,
+  },
+};
+
 export function parsePrice(raw) {
   if (typeof raw === "number") return { kind: "single", values: [raw] };
 
@@ -44,7 +59,8 @@ export function formatPrice(amount) {
   return `$${safe.toFixed(2).replace(".", ",")}`;
 }
 
-export function buildOrderMessage(lines, note) {
+export function buildOrderMessage(lines, options = {}) {
+  const { note = "", modality = "pickup", address = "" } = options;
   const total = lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
   const detail = lines
     .map(
@@ -53,9 +69,13 @@ export function buildOrderMessage(lines, note) {
     )
     .join("\n");
   const notes = (note ?? "").trim();
+  const delivery = modality === "delivery";
+  const destination = (address ?? "").trim();
 
   return [
-    "¡Hola! 👋 Quiero realizar un pedido para llevar en Cafetería Lunaria.",
+    delivery
+      ? "¡Hola! 👋 Quiero realizar un pedido con envío a domicilio en Cafetería Lunaria."
+      : "¡Hola! 👋 Quiero realizar un pedido para llevar en Cafetería Lunaria.",
     "",
     "MI PEDIDO:",
     "",
@@ -63,7 +83,8 @@ export function buildOrderMessage(lines, note) {
     "",
     `TOTAL: ${formatPrice(total)}`,
     "",
-    "MODALIDAD: Para llevar.",
+    `MODALIDAD: ${delivery ? "Envío a domicilio" : "Para llevar"}.`,
+    ...(delivery && destination ? ["", `DIRECCIÓN DE ENTREGA: ${destination}`] : []),
     ...(notes ? ["", `NOTAS: ${notes}`] : []),
     "",
     "¡Gracias! 😊",
@@ -94,6 +115,8 @@ export function CartProvider({ products, children }) {
 
   const [lines, setLines] = useState([]);
   const [note, setNote] = useState("");
+  const [modality, setModality] = useState("pickup");
+  const [address, setAddress] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -127,6 +150,10 @@ export function CartProvider({ products, children }) {
         }
 
         if (typeof saved?.note === "string") setNote(saved.note);
+        if (saved?.modality === "delivery" || saved?.modality === "pickup") {
+          setModality(saved.modality);
+        }
+        if (typeof saved?.address === "string") setAddress(saved.address);
       }
     } catch {
       // Almacenamiento corrupto o no disponible: se empieza con el carrito vacío.
@@ -148,12 +175,14 @@ export function CartProvider({ products, children }) {
             qty: line.qty,
           })),
           note,
+          modality,
+          address,
         }),
       );
     } catch {
       // Sin persistencia (modo privado): el carrito sigue funcionando en memoria.
     }
-  }, [lines, note, hydrated]);
+  }, [lines, note, modality, address, hydrated]);
 
   const addItem = useCallback((product, unitPrice) => {
     setLines((current) => {
@@ -193,6 +222,8 @@ export function CartProvider({ products, children }) {
   const clearCart = useCallback(() => {
     setLines([]);
     setNote("");
+    setModality("pickup");
+    setAddress("");
   }, []);
 
   const openCart = useCallback(() => setIsOpen(true), []);
@@ -208,15 +239,31 @@ export function CartProvider({ products, children }) {
     [lines],
   );
 
+  const isDelivery = modality === "delivery";
+  const missingForMinimum = Math.max(0, DELIVERY_MINIMUM - total);
+  const belowMinimum = isDelivery && missingForMinimum > 0.001;
+  const missingAddress = isDelivery && !address.trim();
+  const canOrder = lines.length > 0 && !belowMinimum && !missingAddress;
+
   const orderMessage = useMemo(
-    () => buildOrderMessage(lines, note),
-    [lines, note],
+    () => buildOrderMessage(lines, { note, modality, address }),
+    [lines, note, modality, address],
   );
 
   const orderLink = useMemo(
-    () => (lines.length ? whatsAppUrl(orderMessage) : ""),
-    [lines.length, orderMessage],
+    () => (canOrder ? whatsAppUrl(orderMessage) : ""),
+    [canOrder, orderMessage],
   );
+
+  // Al preparar el pedido el carrito queda limpio: si el cliente vuelve a la web
+  // no ve el pedido anterior y no puede duplicarlo por error.
+  const prepareOrder = useCallback(() => {
+    setLines([]);
+    setNote("");
+    setModality("pickup");
+    setAddress("");
+    setIsOpen(false);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -225,6 +272,15 @@ export function CartProvider({ products, children }) {
       total,
       note,
       setNote,
+      modality,
+      setModality,
+      address,
+      setAddress,
+      isDelivery,
+      belowMinimum,
+      missingForMinimum,
+      missingAddress,
+      canOrder,
       isOpen,
       openCart,
       closeCart,
@@ -233,6 +289,7 @@ export function CartProvider({ products, children }) {
       decrement,
       removeItem,
       clearCart,
+      prepareOrder,
       orderMessage,
       orderLink,
     }),
@@ -241,6 +298,13 @@ export function CartProvider({ products, children }) {
       count,
       total,
       note,
+      modality,
+      address,
+      isDelivery,
+      belowMinimum,
+      missingForMinimum,
+      missingAddress,
+      canOrder,
       isOpen,
       openCart,
       closeCart,
@@ -249,6 +313,7 @@ export function CartProvider({ products, children }) {
       decrement,
       removeItem,
       clearCart,
+      prepareOrder,
       orderMessage,
       orderLink,
     ],
@@ -274,6 +339,40 @@ export function useCart() {
   }
 
   return context;
+}
+
+/**
+ * Enlace de WhatsApp para el pedido. Al pulsarlo se abre la conversación con el
+ * mensaje ya escrito y el carrito queda vaciado, de modo que si el cliente vuelve
+ * a la web no encuentre el pedido anterior y no pueda duplicarlo.
+ */
+export function useOrderWhatsApp() {
+  const { orderLink, prepareOrder, lines } = useCart();
+  const url =
+    orderLink || whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.");
+
+  const handleClick = (event) => {
+    const href = event.currentTarget.getAttribute("href");
+
+    if (!href) {
+      event.preventDefault();
+      return;
+    }
+
+    // window.open con "noopener" devuelve null por especificacion, asi que se abre
+    // la pestana y se anula el opener a mano para poder detectar el bloqueo.
+    const opened = window.open(href, "_blank");
+
+    if (opened) {
+      opened.opener = null;
+      event.preventDefault();
+      if (lines.length) prepareOrder();
+    }
+    // Si el navegador bloquea la pestana, el enlace nativo se encarga y el carrito
+    // se conserva para que el cliente no pierda el pedido.
+  };
+
+  return { url, handleClick };
 }
 
 export function AddToCartControl({ product, className = "" }) {
@@ -436,6 +535,15 @@ export function CartDrawer() {
     total,
     note,
     setNote,
+    modality,
+    setModality,
+    address,
+    setAddress,
+    isDelivery,
+    belowMinimum,
+    missingForMinimum,
+    missingAddress,
+    canOrder,
     isOpen,
     closeCart,
     increment,
@@ -444,6 +552,8 @@ export function CartDrawer() {
     clearCart,
     orderLink,
   } = useCart();
+
+  const { handleClick } = useOrderWhatsApp();
 
   const [rendered, setRendered] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -519,7 +629,7 @@ export function CartDrawer() {
         <header className="flex items-start justify-between gap-3 border-b border-lunaria-coffee/10 px-5 py-5">
           <div>
             <span className="section-kicker !px-3 !py-1.5 !text-[10px]">
-              Para llevar
+              {isDelivery ? "Envío a domicilio" : "Para llevar"}
             </span>
             <h2 className="mt-2 text-2xl font-black text-lunaria-coal">
               Tu pedido
@@ -630,6 +740,59 @@ export function CartDrawer() {
                 </article>
               ))}
 
+              <fieldset className="rounded-[1.25rem] border border-lunaria-coffee/10 bg-white p-3 shadow-soft">
+                <legend className="px-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-lunaria-coffee/60">
+                  Modalidad
+                </legend>
+
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {Object.values(MODALITIES).map((option) => {
+                    const active = modality === option.id;
+
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setModality(option.id)}
+                        aria-pressed={active}
+                        className={`rounded-2xl border px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${
+                          active
+                            ? "border-lunaria-solar bg-lunaria-solar text-white shadow-soft"
+                            : "border-lunaria-coffee/12 bg-lunaria-warm text-lunaria-coal hover:bg-lunaria-cream"
+                        }`}
+                      >
+                        <span className="block text-xs font-extrabold leading-tight">
+                          {option.label}
+                        </span>
+                        <span
+                          className={`mt-0.5 block font-mono text-[10px] font-medium ${
+                            active ? "text-white/80" : "text-lunaria-coffee/60"
+                          }`}
+                        >
+                          {option.hint}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isDelivery && (
+                  <label className="mt-3 block">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-lunaria-coffee/60">
+                      Dirección de entrega
+                    </span>
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={(event) => setAddress(event.target.value)}
+                      maxLength={160}
+                      placeholder="Calle, número, referencia y sector"
+                      className="mt-2 w-full rounded-2xl border border-lunaria-coffee/10 bg-lunaria-warm/60 px-3 py-2 text-sm text-lunaria-coal outline-none transition placeholder:text-lunaria-coffee/40 focus:border-lunaria-solar"
+                    />
+                  </label>
+                )}
+              </fieldset>
+
               <label className="block rounded-[1.25rem] border border-lunaria-coffee/10 bg-white p-3 shadow-soft">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-lunaria-coffee/60">
                   Notas del pedido (opcional)
@@ -688,16 +851,42 @@ export function CartDrawer() {
                 )}
               </div>
 
-              <a
-                href={orderLink}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Hacer pedido por WhatsApp"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-lunaria-coal px-5 py-4 text-sm font-extrabold text-white shadow-warm transition hover:-translate-y-0.5 hover:bg-lunaria-solar focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lunaria-solar"
-              >
-                <MessageCircle className="h-5 w-5" />
-                Hacer pedido por WhatsApp
-              </a>
+              {(belowMinimum || missingAddress) && (
+                <p
+                  role="alert"
+                  className="mt-3 rounded-2xl border border-lunaria-coffee/15 bg-lunaria-latte/40 px-3 py-2.5 text-xs font-bold leading-5 text-lunaria-coffee"
+                >
+                  {belowMinimum
+                    ? `El envío a domicilio pide un mínimo de ${formatPrice(
+                        DELIVERY_MINIMUM,
+                      )}. Te faltan ${formatPrice(missingForMinimum)}.`
+                    : "Escribe la dirección de entrega para poder enviar el pedido."}
+                </p>
+              )}
+
+              {canOrder ? (
+                <a
+                  href={orderLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={handleClick}
+                  aria-label="Hacer pedido por WhatsApp"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-lunaria-coal px-5 py-4 text-sm font-extrabold text-white shadow-warm transition hover:-translate-y-0.5 hover:bg-lunaria-solar focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lunaria-solar"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Hacer pedido por WhatsApp
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  aria-label="Hacer pedido por WhatsApp"
+                  className="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-lunaria-coal/35 px-5 py-4 text-sm font-extrabold text-white"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Hacer pedido por WhatsApp
+                </button>
+              )}
 
               <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-lunaria-coffee/45">
                 Se abrirá WhatsApp con el pedido listo para enviar
