@@ -20,10 +20,18 @@ import {
 } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import {
+  AddToCartControl,
+  CartButton,
+  CartDrawer,
+  CartFab,
+  CartProvider,
+  parsePrice,
+  useCart,
+} from "./cart";
+import { whatsAppUrl } from "./whatsapp";
 
 gsap.registerPlugin(ScrollTrigger);
-
-const WHATSAPP_BASE = "https://api.whatsapp.com/send?phone=593980649164";
 
 const categories = [
   { id: "calientes", label: "Calientes", icon: Coffee },
@@ -391,6 +399,8 @@ const products = menuSections.flatMap((section) =>
     description: section.description,
     image: imageForProduct(name, section.image),
     tag: index === 0 ? section.subcategory : undefined,
+    id: `${section.section}·${section.subcategory}·${name}`,
+    priceOptions: parsePrice(price).values,
   })),
 );
 
@@ -467,11 +477,12 @@ const faqs = [
     answer:
       "Sí. La experiencia está pensada mobile-first para explorar, buscar y pedir rápido desde el teléfono.",
   },
+  {
+    question: "¿Puedo armar un pedido para llevar?",
+    answer:
+      "Sí. Añade los productos que quieras al carrito, ajusta las cantidades, deja una nota si hace falta y pulsa «Hacer pedido por WhatsApp». Se abrirá WhatsApp con el pedido ya escrito para que solo tengas que enviarlo.",
+  },
 ];
-
-function whatsAppUrl(message) {
-  return `${WHATSAPP_BASE}&text=${encodeURIComponent(message)}`;
-}
 
 function scrollToId(id, event) {
   event?.preventDefault?.();
@@ -583,8 +594,8 @@ function MagneticButton({
 
 function ProductCard({ product }) {
   return (
-    <article className="menu-card group overflow-hidden rounded-[1.5rem] border border-lunaria-coffee/10 bg-white shadow-warm transition duration-500 hover:-translate-y-1 hover:scale-[1.02]">
-      <div className="relative aspect-square overflow-hidden rounded-b-[1.5rem]">
+    <article className="menu-card group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-lunaria-coffee/10 bg-white shadow-warm transition duration-500 hover:-translate-y-1 hover:scale-[1.02]">
+      <div className="relative aspect-square shrink-0 overflow-hidden rounded-b-[1.5rem]">
         <img
           src={product.image}
           alt={product.name}
@@ -599,7 +610,7 @@ function ProductCard({ product }) {
         )}
       </div>
 
-      <div className="p-4">
+      <div className="flex flex-1 flex-col p-4">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-lunaria-coffee/60">
           {product.section} · {product.subcategory}
         </p>
@@ -611,12 +622,16 @@ function ProductCard({ product }) {
             {product.price}
           </span>
         </div>
+
+        <div className="mt-auto pt-4">
+          <AddToCartControl product={product} />
+        </div>
       </div>
     </article>
   );
 }
 
-function App() {
+function LunariaSite() {
   const appRef = useRef(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeCategory, setActiveCategory] = useState("todos");
@@ -734,37 +749,57 @@ function App() {
   }, []);
 
   return (
-    <main
-      ref={appRef}
-      className="relative min-h-screen overflow-hidden bg-lunaria-warm text-lunaria-coal"
-    >
-      <Navbar isScrolled={isScrolled} />
-      <Hero />
-      <FeaturedMenuSection
-        featuredProducts={featuredProducts}
-        setActiveCategory={setActiveCategory}
-        setQuery={setQuery}
-      />
-      <FullMenuSection
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-        query={query}
-        setQuery={setQuery}
-        groupedProducts={groupedProducts}
-        visibleCount={filteredProducts.length}
-      />
-      <Gallery />
-      <LocalSpotlight />
-      <Process />
-      <FAQ activeFaq={activeFaq} setActiveFaq={setActiveFaq} />
-      <FinalCTA />
-      <Footer />
-    </main>
+    <>
+      <main
+        ref={appRef}
+        className="relative min-h-screen overflow-hidden bg-lunaria-warm text-lunaria-coal"
+      >
+        <Navbar isScrolled={isScrolled} />
+        <Hero />
+        <FeaturedMenuSection
+          featuredProducts={featuredProducts}
+          setActiveCategory={setActiveCategory}
+          setQuery={setQuery}
+        />
+        <FullMenuSection
+          activeCategory={activeCategory}
+          setActiveCategory={setActiveCategory}
+          query={query}
+          setQuery={setQuery}
+          groupedProducts={groupedProducts}
+          visibleCount={filteredProducts.length}
+        />
+        <Gallery />
+        <LocalSpotlight />
+        <Process />
+        <FAQ activeFaq={activeFaq} setActiveFaq={setActiveFaq} />
+        <FinalCTA />
+        <Footer />
+      </main>
+
+      <CartFab />
+      <CartDrawer />
+    </>
   );
+}
+
+function App() {
+  return (
+    <CartProvider products={products}>
+      <LunariaSite />
+    </CartProvider>
+  );
+}
+
+function useOrderWhatsAppUrl() {
+  const { orderLink } = useCart();
+
+  return orderLink || whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.");
 }
 
 function Navbar({ isScrolled }) {
   const [open, setOpen] = useState(false);
+  const orderUrl = useOrderWhatsAppUrl();
   const navLinks = [
     { label: "Inicio", id: "inicio" },
     { label: "Menú", id: "menu" },
@@ -820,7 +855,7 @@ function Navbar({ isScrolled }) {
 
         <div className="flex items-center gap-2">
           <MagneticButton
-            href={whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.")}
+            href={orderUrl}
             target="_blank"
             rel="noreferrer"
             className="hidden bg-lunaria-coal text-white hover:bg-lunaria-solar sm:inline-flex"
@@ -828,6 +863,8 @@ function Navbar({ isScrolled }) {
             Pedir por WhatsApp
             <MessageCircle className="h-4 w-4" />
           </MagneticButton>
+
+          <CartButton />
 
           <button
             type="button"
@@ -870,7 +907,7 @@ function Navbar({ isScrolled }) {
             </button>
           ))}
           <MagneticButton
-            href={whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.")}
+            href={orderUrl}
             target="_blank"
             rel="noreferrer"
             className="mt-2 w-full bg-lunaria-solar text-white"
@@ -885,6 +922,8 @@ function Navbar({ isScrolled }) {
 }
 
 function Hero() {
+  const orderUrl = useOrderWhatsAppUrl();
+
   return (
     <section
       id="inicio"
@@ -927,7 +966,7 @@ function Hero() {
               <ArrowUpRight className="h-4 w-4" />
             </MagneticButton>
             <MagneticButton
-              href={whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.")}
+              href={orderUrl}
               target="_blank"
               rel="noreferrer"
               className="border border-lunaria-coffee/12 bg-white text-lunaria-coal shadow-soft hover:bg-lunaria-cream"
@@ -1420,6 +1459,8 @@ function FAQ({ activeFaq, setActiveFaq }) {
 }
 
 function FinalCTA() {
+  const orderUrl = useOrderWhatsAppUrl();
+
   return (
     <section id="contacto" className="scroll-mt-28 px-4 py-20 sm:px-6 lg:px-8">
       <div className="reveal texture-solar relative mx-auto max-w-7xl overflow-hidden rounded-[3rem] bg-lunaria-solar p-8 text-white shadow-solar sm:p-12 lg:p-16">
@@ -1441,7 +1482,7 @@ function FinalCTA() {
 
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
             <MagneticButton
-              href={whatsAppUrl("Hola, quiero hacer un pedido en Cafetería Lunaria.")}
+              href={orderUrl}
               target="_blank"
               rel="noreferrer"
               className="bg-white text-lunaria-coal hover:bg-lunaria-cream"

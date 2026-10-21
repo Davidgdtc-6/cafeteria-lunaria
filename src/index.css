@@ -135,6 +135,24 @@ img {
   }
 }
 
+@keyframes lunaria-badge-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.4);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.lunaria-badge-pop {
+  animation: lunaria-badge-pop 0.4s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
