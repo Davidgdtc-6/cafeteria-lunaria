@@ -375,7 +375,7 @@ export function useOrderWhatsApp() {
   return { url, handleClick };
 }
 
-export function AddToCartControl({ product, className = "" }) {
+export function AddToCartControl({ product, className = "", variant = "block" }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const timeoutRef = useRef(null);
@@ -398,6 +398,8 @@ export function AddToCartControl({ product, className = "" }) {
   };
 
   if (isConsult) {
+    if (variant === "icon") return null;
+
     return (
       <a
         href={whatsAppUrl(
@@ -414,6 +416,26 @@ export function AddToCartControl({ product, className = "" }) {
   }
 
   const isVariant = options.length > 1;
+
+  // Version compacta para la cuadricula del menu: solo el icono, sobre la foto.
+  if (variant === "icon") {
+    if (isVariant) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => confirmAdd(options[0])}
+        aria-label={`Añadir ${product.name} al pedido`}
+        className={`grid place-items-center rounded-full bg-white/95 text-lunaria-coal shadow-soft transition hover:-translate-y-0.5 hover:bg-lunaria-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${className}`}
+      >
+        {added ? (
+          <Check className="h-4 w-4 text-lunaria-solar" />
+        ) : (
+          <Plus className="h-4 w-4" />
+        )}
+      </button>
+    );
+  }
 
   return (
     <div className={className}>
@@ -471,8 +493,16 @@ export function AddToCartControl({ product, className = "" }) {
   );
 }
 
-export function CartButton({ className = "" }) {
+export function CartButton({ className = "", tone = "auto" }) {
   const { count, openCart } = useCart();
+  const filled = count > 0;
+
+  const tones =
+    tone === "light"
+      ? "bg-white text-lunaria-coal hover:bg-lunaria-cream"
+      : filled
+        ? "bg-lunaria-coal text-white shadow-soft hover:bg-lunaria-solar"
+        : "bg-lunaria-warm text-lunaria-coal hover:bg-lunaria-cream";
 
   return (
     <button
@@ -480,16 +510,16 @@ export function CartButton({ className = "" }) {
       onClick={openCart}
       aria-label={
         count
-          ? `Ver mi pedido, ${count} ${count === 1 ? "producto" : "productos"}`
-          : "Ver mi pedido, carrito vacío"
+          ? `Ver carrito, ${count} ${count === 1 ? "producto" : "productos"}`
+          : "Ver carrito, vacío"
       }
-      className={`relative grid h-11 w-11 place-items-center rounded-full bg-lunaria-warm text-lunaria-coal transition hover:-translate-y-0.5 hover:bg-lunaria-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${className}`}
+      className={`relative grid place-items-center rounded-full transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${tones} ${className}`}
     >
       <ShoppingBag className="h-5 w-5" />
       {count > 0 && (
         <span
           key={count}
-          className="absolute -right-1 -top-1 grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-lunaria-coffee px-1 font-mono text-[10px] font-bold text-white shadow-soft lunaria-badge-pop"
+          className="absolute -right-1 -top-1 grid h-5 min-w-[1.25rem] place-items-center rounded-full bg-lunaria-cream px-1 font-mono text-[10px] font-bold text-lunaria-coffee shadow-soft lunaria-badge-pop"
         >
           {count}
         </span>
@@ -509,17 +539,20 @@ export function CartFab({ className = "" }) {
       onClick={openCart}
       aria-label={
         count
-          ? `Ver mi pedido, ${count} ${count === 1 ? "producto" : "productos"}`
-          : "Ver mi pedido, carrito vacío"
+          ? `Ver carrito, ${count} ${count === 1 ? "producto" : "productos"}`
+          : "Ver carrito, vacío"
       }
-      className={`fixed bottom-5 right-5 z-[60] inline-flex items-center gap-2 rounded-full bg-lunaria-coal px-5 py-4 text-sm font-extrabold text-white shadow-warm transition hover:-translate-y-0.5 hover:bg-lunaria-solar focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lunaria-solar sm:bottom-6 sm:right-6 ${className}`}
+      className={`fixed bottom-4 right-4 z-[60] grid h-14 w-14 place-items-center rounded-full shadow-warm transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lunaria-solar sm:bottom-6 sm:right-6 ${
+        count
+          ? "bg-lunaria-coal text-white hover:bg-lunaria-solar"
+          : "bg-lunaria-warm/92 text-lunaria-coal backdrop-blur hover:bg-lunaria-cream"
+      } ${className}`}
     >
-      <ShoppingBag className="h-5 w-5" />
-      <span>Pedido</span>
+      <ShoppingBag className="h-6 w-6" />
       {count > 0 && (
         <span
           key={count}
-          className="grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-lunaria-cream px-1.5 font-mono text-[11px] font-bold text-lunaria-coffee lunaria-badge-pop"
+          className="absolute -right-1 -top-1 grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-lunaria-cream px-1.5 font-mono text-[11px] font-bold text-lunaria-coffee shadow-soft lunaria-badge-pop"
         >
           {count}
         </span>

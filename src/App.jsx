@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
   ArrowUpRight,
   CakeSlice,
   CalendarDays,
@@ -12,6 +13,7 @@ import {
   MapPin,
   MessageCircle,
   Moon,
+  Plus,
   Search,
   ShoppingBag,
   Sparkles,
@@ -26,9 +28,11 @@ import {
   CartDrawer,
   CartFab,
   CartProvider,
+  formatPrice,
   parsePrice,
-  useOrderWhatsApp,
+  useCart,
 } from "./cart";
+import { navigate, useRoute } from "./router";
 import { whatsAppUrl } from "./whatsapp";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -631,34 +635,10 @@ function ProductCard({ product }) {
   );
 }
 
-function LunariaSite() {
+function Landing() {
   const appRef = useRef(null);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("todos");
-  const [query, setQuery] = useState("");
   const [activeFaq, setActiveFaq] = useState(0);
-
-  const filteredProducts = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return products.filter((product) => {
-      const matchesCategory = productMatchesCategory(product, activeCategory);
-      const matchesSearch =
-        normalizedQuery.length === 0 ||
-        [
-          product.name,
-          product.description,
-          product.price,
-          product.tag,
-          product.section,
-          product.subcategory,
-        ]
-          .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(normalizedQuery));
-
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, query]);
 
   const featuredProducts = useMemo(() => {
     const featuredNames = [
@@ -672,21 +652,6 @@ function LunariaSite() {
       .map((name) => products.find((product) => product.name === name))
       .filter(Boolean);
   }, []);
-
-  const groupedProducts = useMemo(
-    () =>
-      menuSections
-        .map((section) => ({
-          ...section,
-          products: filteredProducts.filter(
-            (product) =>
-              product.section === section.section &&
-              product.subcategory === section.subcategory,
-          ),
-        }))
-        .filter((section) => section.products.length > 0),
-    [filteredProducts],
-  );
 
   useEffect(() => {
     const updateScroll = () => setIsScrolled(window.scrollY > 18);
@@ -756,19 +721,7 @@ function LunariaSite() {
       >
         <Navbar isScrolled={isScrolled} />
         <Hero />
-        <FeaturedMenuSection
-          featuredProducts={featuredProducts}
-          setActiveCategory={setActiveCategory}
-          setQuery={setQuery}
-        />
-        <FullMenuSection
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-          query={query}
-          setQuery={setQuery}
-          groupedProducts={groupedProducts}
-          visibleCount={filteredProducts.length}
-        />
+        <FeaturedMenuSection featuredProducts={featuredProducts} />
         <Gallery />
         <LocalSpotlight />
         <Process />
@@ -786,14 +739,24 @@ function LunariaSite() {
 function App() {
   return (
     <CartProvider products={products}>
-      <LunariaSite />
+      <AppRouter />
     </CartProvider>
   );
 }
 
+function AppRouter() {
+  const path = useRoute();
+  const isMenu = path === "/menu";
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [path]);
+
+  return isMenu ? <MenuPage /> : <Landing />;
+}
+
 function Navbar({ isScrolled }) {
   const [open, setOpen] = useState(false);
-  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
   const navLinks = [
     { label: "Inicio", id: "inicio" },
     { label: "Menú", id: "menu" },
@@ -802,7 +765,13 @@ function Navbar({ isScrolled }) {
   ];
 
   const handleNavClick = (id) => {
-    scrollToId(id);
+    if (id === "menu") {
+      navigate("/menu");
+    } else {
+      if (id === "inicio") navigate("/");
+      scrollToId(id);
+    }
+
     setOpen(false);
   };
 
@@ -848,18 +817,7 @@ function Navbar({ isScrolled }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <MagneticButton
-            href={orderUrl}
-            onClick={handleOrder}
-            target="_blank"
-            rel="noreferrer"
-            className="hidden bg-lunaria-coal text-white hover:bg-lunaria-solar sm:inline-flex"
-          >
-            Pedir por WhatsApp
-            <MessageCircle className="h-4 w-4" />
-          </MagneticButton>
-
-          <CartButton />
+          <CartButton className="h-11 w-11" />
 
           <button
             type="button"
@@ -901,16 +859,17 @@ function Navbar({ isScrolled }) {
               <ArrowUpRight className="h-4 w-4" />
             </button>
           ))}
-          <MagneticButton
-            href={orderUrl}
-            onClick={handleOrder}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 w-full bg-lunaria-solar text-white"
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              navigate("/menu");
+            }}
+            className="mt-2 flex w-full items-center justify-between rounded-full bg-lunaria-solar px-4 py-3 text-left text-sm font-extrabold text-white transition hover:bg-lunaria-coffee"
           >
-            Pedir por WhatsApp
-            <MessageCircle className="h-4 w-4" />
-          </MagneticButton>
+            Ver menú completo
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
         </div>
       )}
     </header>
@@ -918,8 +877,6 @@ function Navbar({ isScrolled }) {
 }
 
 function Hero() {
-  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
-
   return (
     <section
       id="inicio"
@@ -953,24 +910,15 @@ function Hero() {
             el primer vistazo.
           </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-9 flex items-center gap-3">
             <MagneticButton
-              onClick={(event) => scrollToId("menu", event)}
-              className="bg-lunaria-solar text-white shadow-solar hover:bg-lunaria-coffee"
+              onClick={() => navigate("/menu")}
+              className="flex-1 bg-lunaria-solar text-white shadow-solar hover:bg-lunaria-coffee sm:flex-none"
             >
-              Ver menú
+              Ver menú completo
               <ArrowUpRight className="h-4 w-4" />
             </MagneticButton>
-            <MagneticButton
-              href={orderUrl}
-              onClick={handleOrder}
-              target="_blank"
-              rel="noreferrer"
-              className="border border-lunaria-coffee/12 bg-white text-lunaria-coal shadow-soft hover:bg-lunaria-cream"
-            >
-              Hacer pedido
-              <MessageCircle className="h-4 w-4" />
-            </MagneticButton>
+            <CartButton className="h-14 w-14 shrink-0" />
           </div>
 
           <div className="mt-10 flex flex-wrap gap-3">
@@ -1048,11 +996,9 @@ function Hero() {
   );
 }
 
-function FeaturedMenuSection({ featuredProducts, setActiveCategory, setQuery }) {
-  const openFullMenu = (event) => {
-    setQuery("");
-    setActiveCategory("todos");
-    scrollToId("menu", event);
+function FeaturedMenuSection({ featuredProducts }) {
+  const openFullMenu = () => {
+    navigate("/menu");
   };
 
   return (
@@ -1098,121 +1044,292 @@ function FeaturedMenuSection({ featuredProducts, setActiveCategory, setQuery }) 
   );
 }
 
-function FullMenuSection({
-  activeCategory,
-  setActiveCategory,
-  query,
-  setQuery,
-  groupedProducts,
-  visibleCount,
-}) {
+const menuChips = [{ id: "todos", label: "Todo", icon: Sparkles }, ...categories];
+
+function MenuProductCard({ product }) {
+  const { addItem } = useCart();
+  const options = product.priceOptions;
+  const isConsult = !Array.isArray(options) || options.length === 0;
+  const isVariant = !isConsult && options.length > 1;
+  const [addedPrice, setAddedPrice] = useState(null);
+  const timeoutRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
+
+  const addVariant = (unitPrice) => {
+    addItem(product, unitPrice);
+    setAddedPrice(unitPrice);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setAddedPrice(null), 1200);
+  };
+
   return (
-    <section
-      id="menu"
-      className="relative min-h-screen scroll-mt-28 px-4 py-20 sm:px-6 lg:px-8"
-    >
-      <div className="absolute inset-x-0 top-16 -z-10 h-[38rem] bg-lunaria-latte/24" />
-      <div className="mx-auto max-w-7xl">
-        <div className="reveal mx-auto max-w-3xl text-center">
-          <span className="section-kicker">Menú completo</span>
-          <h2 className="mt-4 text-[clamp(2.5rem,5vw,5rem)] font-black leading-[0.95] tracking-normal text-lunaria-coal">
-            Toda la carta,
-            <span className="block font-serif italic text-lunaria-solar">
-              por secciones.
-            </span>
-          </h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-lunaria-coal/68">
-            Explora calientes, frías, desayunos, postres, helados, salados y
-            coctelería sin salir de esta pantalla.
-          </p>
-        </div>
+    <article className="menu-card group relative flex h-full flex-col overflow-hidden rounded-xl border border-lunaria-coffee/10 bg-white shadow-soft transition duration-300 hover:-translate-y-0.5">
+      <div className="relative aspect-square overflow-hidden">
+        <img
+          src={product.image}
+          alt={product.name}
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+        {!isConsult && !isVariant && (
+          <AddToCartControl
+            product={product}
+            variant="icon"
+            className="absolute bottom-1.5 right-1.5 h-9 w-9 sm:h-10 sm:w-10"
+          />
+        )}
+      </div>
 
-        <div className="reveal mt-10 rounded-[2.5rem] border border-lunaria-coffee/10 bg-white/76 p-4 shadow-warm backdrop-blur-xl sm:p-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-lunaria-coffee/55" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar en el menú..."
-                className="h-14 w-full rounded-full border border-lunaria-coffee/10 bg-white pl-13 pr-5 text-sm font-bold text-lunaria-coal shadow-soft outline-none transition placeholder:text-lunaria-coffee/44 focus:border-lunaria-solar"
-              />
-            </label>
-            <div className="flex h-14 items-center justify-center rounded-full bg-lunaria-coal px-5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">
-              {visibleCount} productos
-            </div>
-          </div>
+      <div className="flex flex-1 flex-col p-1.5 sm:p-2.5">
+        <h3 className="line-clamp-3 text-[12px] font-extrabold leading-[1.15] text-lunaria-coal sm:line-clamp-2 sm:text-sm">
+          {product.name}
+        </h3>
 
-          <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
-            <button
-              type="button"
-              onClick={() => setActiveCategory("todos")}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-3 text-sm font-extrabold transition ${
-                activeCategory === "todos"
-                  ? "bg-lunaria-solar text-white shadow-solar"
-                  : "bg-lunaria-warm text-lunaria-coal hover:-translate-y-0.5 hover:bg-lunaria-cream"
-              }`}
+        <div className="mt-auto pt-1">
+          {isConsult ? (
+            <a
+              href={whatsAppUrl(
+                `Hola, quiero consultar el precio de "${product.name}" en Cafetería Lunaria.`,
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1 rounded-full border border-lunaria-coffee/20 px-2 py-1 font-mono text-[10px] font-bold text-lunaria-coffee transition hover:bg-lunaria-cream"
             >
-              <Sparkles className="h-4 w-4" />
-              Todo
-            </button>
-            {categories.map((category) => {
-              const Icon = category.icon;
-              const active = activeCategory === category.id;
-              return (
+              Consultar
+            </a>
+          ) : isVariant ? (
+            <div className="flex flex-col gap-1">
+              {options.map((option) => (
                 <button
-                  key={category.id}
+                  key={option}
                   type="button"
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-3 text-sm font-extrabold transition ${
-                    active
-                      ? "bg-lunaria-solar text-white shadow-solar"
-                      : "bg-lunaria-warm text-lunaria-coal hover:-translate-y-0.5 hover:bg-lunaria-cream"
+                  onClick={() => addVariant(option)}
+                  aria-label={`Añadir ${product.name} al pedido por ${formatPrice(option)}`}
+                  className={`flex items-center justify-center gap-1 rounded-full px-1.5 py-1 font-mono text-[10px] font-bold text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${
+                    addedPrice === option ? "bg-lunaria-solar" : "bg-lunaria-coal"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  {category.label}
+                  {addedPrice === option ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : (
+                    <Plus className="h-3 w-3" />
+                  )}
+                  {formatPrice(option)}
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="font-mono text-[10px] font-bold text-lunaria-solar sm:text-xs">
+              {product.price}
+            </p>
+          )}
         </div>
+      </div>
+    </article>
+  );
+}
 
-        <div className="mt-10 space-y-12">
-          {groupedProducts.map((section) => (
-            <section key={`${section.section}-${section.subcategory}`}>
-              <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                <div>
-                  <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-lunaria-solar">
-                    {section.subcategory}
-                  </p>
-                  <h3 className="mt-2 text-3xl font-black text-lunaria-coal">
-                    {section.section}
-                  </h3>
-                </div>
-                <span className="w-fit rounded-full bg-white px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.14em] text-lunaria-coffee shadow-soft">
-                  {section.products.length} opciones
-                </span>
-              </div>
+function MenuPage() {
+  const [activeCategory, setActiveCategory] = useState("todos");
+  const [query, setQuery] = useState("");
+  const gridRef = useRef(null);
+  const chipsRef = useRef(null);
+  const chipRefs = useRef({});
 
-              <div className="stagger-section grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                {section.products.map((product) => (
-                  <div key={`${section.section}-${product.name}`} className="stagger-item">
-                    <ProductCard product={product} />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesCategory = productMatchesCategory(product, activeCategory);
+      const matchesSearch =
+        normalizedQuery.length === 0 ||
+        [
+          product.name,
+          product.description,
+          product.price,
+          product.tag,
+          product.section,
+          product.subcategory,
+        ]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(normalizedQuery));
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [activeCategory, query]);
+
+  const groupedProducts = useMemo(
+    () =>
+      menuSections
+        .map((section) => ({
+          ...section,
+          products: filteredProducts.filter(
+            (product) =>
+              product.section === section.section &&
+              product.subcategory === section.subcategory,
+          ),
+        }))
+        .filter((section) => section.products.length > 0),
+    [filteredProducts],
+  );
+
+  const selectCategory = (id) => {
+    setActiveCategory(id);
+
+    window.setTimeout(() => {
+      const grid = gridRef.current;
+      if (!grid) return;
+
+      const top = grid.getBoundingClientRect().top;
+
+      if (top > 132) {
+        window.scrollTo({ top: window.scrollY + top - 124, behavior: "smooth" });
+      }
+    }, 70);
+  };
+
+  // mantiene visible el chip activo en la fila desplazable
+  useEffect(() => {
+    const container = chipsRef.current;
+    const chip = chipRefs.current[activeCategory];
+    if (!container || !chip) return;
+
+    const left = chip.offsetLeft - container.clientWidth / 2 + chip.clientWidth / 2;
+    container.scrollTo({ left, behavior: "smooth" });
+  }, [activeCategory]);
+
+  return (
+    <div className="min-h-screen bg-lunaria-warm text-lunaria-coal">
+      <header className="sticky top-0 z-40 border-b border-lunaria-coffee/10 bg-lunaria-warm">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2 sm:px-6">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            aria-label="Volver a la portada"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-lunaria-coal shadow-soft transition hover:-translate-y-0.5 hover:bg-lunaria-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Portada
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="ml-1 flex items-center gap-2"
+            aria-label="Ir a la portada de Cafetería Lunaria"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-lunaria-solar text-white shadow-solar">
+              <Moon className="h-4 w-4 fill-white/20" />
+            </span>
+            <span className="hidden text-left leading-none sm:block">
+              <span className="block text-sm font-extrabold">Cafetería Lunaria</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-lunaria-coffee/70">
+                Piñas, El Oro
+              </span>
+            </span>
+          </button>
+
+          <CartButton className="ml-auto" />
         </div>
+      </header>
 
-        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-6 text-lunaria-coffee/68">
-          Precios y disponibilidad según carta en barra. Bebidas con alcohol
-          solo para mayores de edad.
-        </p>
+      <section className="px-3 pt-6 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <span className="section-kicker">Carta Lunaria</span>
+          <h1 className="mt-3 text-[clamp(2.4rem,8vw,4.4rem)] font-black leading-[0.95] text-lunaria-coal">
+            Nuestro{" "}
+            <span className="font-serif italic text-lunaria-solar">menú</span>
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-lunaria-coal/68 sm:text-base">
+            Elige tus favoritos, arma tu pedido y envíalo por WhatsApp.{" "}
+            {filteredProducts.length} productos disponibles ahora mismo.
+          </p>
+        </div>
+      </section>
 
-        {visibleCount === 0 && (
-          <div className="mt-10 rounded-[2rem] border border-lunaria-coffee/10 bg-white p-8 text-center shadow-soft">
+      <div className="sticky top-[60px] z-30 mt-5 border-y border-lunaria-coffee/10 bg-lunaria-warm">
+        <div
+          ref={chipsRef}
+          className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-3 py-2.5 sm:px-6"
+        >
+          {menuChips.map((category) => {
+            const Icon = category.icon;
+            const active = activeCategory === category.id;
+
+            return (
+              <button
+                key={category.id}
+                ref={(node) => {
+                  chipRefs.current[category.id] = node;
+                }}
+                type="button"
+                onClick={() => selectCategory(category.id)}
+                aria-pressed={active}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-extrabold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lunaria-solar ${
+                  active
+                    ? "bg-lunaria-solar text-white shadow-soft"
+                    : "bg-white text-lunaria-coal shadow-soft hover:-translate-y-0.5 hover:bg-lunaria-cream"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {category.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-3 pt-4 sm:px-6">
+        <label className="relative mx-auto block max-w-7xl">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-lunaria-coffee/55" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar en el menú..."
+            className="h-12 w-full rounded-full border border-lunaria-coffee/10 bg-white pl-11 pr-5 text-sm font-bold text-lunaria-coal shadow-soft outline-none transition placeholder:text-lunaria-coffee/44 focus:border-lunaria-solar"
+          />
+        </label>
+      </div>
+
+      <main ref={gridRef} className="mx-auto max-w-7xl px-3 pb-32 pt-5 sm:px-6">
+        {groupedProducts.map((section) => (
+          <section
+            key={`${section.section}-${section.subcategory}`}
+            className="mb-8 scroll-mt-[124px]"
+          >
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-lunaria-solar">
+                  {section.subcategory}
+                </p>
+                <h2 className="mt-1 truncate text-lg font-black text-lunaria-coal sm:text-2xl">
+                  {section.section}
+                </h2>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-lunaria-coffee shadow-soft">
+                {section.products.length} opciones
+              </span>
+            </div>
+
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(78px,1fr))] gap-1.5 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5">
+              {section.products.map((product) => (
+                <MenuProductCard
+                  key={`${section.section}-${product.name}`}
+                  product={product}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+
+        {groupedProducts.length === 0 && (
+          <div className="rounded-[2rem] border border-lunaria-coffee/10 bg-white p-8 text-center shadow-soft">
             <p className="font-serif text-2xl italic text-lunaria-solar">
               No encontramos ese antojo.
             </p>
@@ -1221,8 +1338,11 @@ function FullMenuSection({
             </p>
           </div>
         )}
-      </div>
-    </section>
+      </main>
+
+      <CartFab />
+      <CartDrawer />
+    </div>
   );
 }
 
@@ -1456,8 +1576,6 @@ function FAQ({ activeFaq, setActiveFaq }) {
 }
 
 function FinalCTA() {
-  const { url: orderUrl, handleClick: handleOrder } = useOrderWhatsApp();
-
   return (
     <section id="contacto" className="scroll-mt-28 px-4 py-20 sm:px-6 lg:px-8">
       <div className="reveal texture-solar relative mx-auto max-w-7xl overflow-hidden rounded-[3rem] bg-lunaria-solar p-8 text-white shadow-solar sm:p-12 lg:p-16">
@@ -1478,16 +1596,10 @@ function FinalCTA() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <MagneticButton
-              href={orderUrl}
-              onClick={handleOrder}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-white text-lunaria-coal hover:bg-lunaria-cream"
-            >
-              Hacer pedido
-              <ShoppingBag className="h-4 w-4" />
-            </MagneticButton>
+            <CartButton
+              tone="light"
+              className="h-14 w-14 bg-white text-lunaria-coal hover:bg-lunaria-cream"
+            />
             <MagneticButton
               href={whatsAppUrl("Hola, quiero reservar una mesa en Cafetería Lunaria.")}
               target="_blank"
@@ -1533,7 +1645,7 @@ function Footer() {
             <div className="mt-5 flex flex-col items-start gap-3">
               <button
                 type="button"
-                onClick={() => scrollToId("menu")}
+                onClick={() => navigate("/menu")}
                 className="transition hover:-translate-y-0.5 hover:text-lunaria-cream"
               >
                 Menú
